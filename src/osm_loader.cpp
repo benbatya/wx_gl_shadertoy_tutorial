@@ -17,6 +17,8 @@
 
 */
 
+#include "osm_loader.h"
+
 #include <cstdint> // for std::uint64_t
 #include <exception>
 #include <iostream> // for std::cout, std::cerr
@@ -64,7 +66,7 @@ struct CountHandler : public osmium::handler::Handler {
 
 bool OSMLoader::Count()
 {
-    if (filename_.empty()) {
+    if (filepath_.empty()) {
         std::cerr << "No input file specified." << std::endl;
         return false;
     }
@@ -72,8 +74,10 @@ bool OSMLoader::Count()
     try {
         // The Reader is initialized here with an osmium::io::File, but could
         // also be directly initialized with a file name.
-        const osmium::io::File input_file { filename_ };
+        const osmium::io::File input_file { filepath_ };
         osmium::io::Reader reader { input_file };
+
+        std::cout << "Counting OSM objects in file: " << filepath_ << std::endl;
 
         // Create an instance of our own CountHandler and push the data from the
         // input file through it.

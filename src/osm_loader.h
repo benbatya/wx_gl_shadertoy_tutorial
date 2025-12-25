@@ -7,7 +7,7 @@ public:
     OSMLoader() = default;
 
     void setFilepath(const std::string& filepath) { filepath_ = filepath; }
-    int Count();
+    bool Count();
 
 protected:
     std::string filepath_ {};

@@ -38,7 +38,7 @@ To build the project, use:
 
 ```bash
 cmake -S. -Bbuild
-cmake --build build -j
+cmake --build build -j8 --target main
 ```
 
 This will create a directory named `build` and create all build artifacts there. The main executable can be found directly in the `build/` folder.
