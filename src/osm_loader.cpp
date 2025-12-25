@@ -108,3 +108,60 @@ bool OSMLoader::Count()
 
     return true;
 }
+
+OSMLoader::Routes OSMLoader::getRoutes(const CoordinateBounds& bounds) const
+{
+    Routes routes;
+
+    if (filepath_.empty()) {
+        std::cerr << "No input file specified." << std::endl;
+        return routes;
+    }
+
+    try {
+        const osmium::io::File input_file { filepath_ };
+        osmium::io::Reader reader { input_file };
+
+        struct RouteHandler : public osmium::handler::Handler {
+            const CoordinateBounds& bounds;
+            Routes& routes_ref;
+
+            RouteHandler(const CoordinateBounds& b, Routes& r)
+                : bounds(b)
+                , routes_ref(r)
+            {
+            }
+
+            static bool contains(const CoordinateBounds& b, const Coordinate& c)
+            {
+                return b.first.first <= c.first && c.first <= b.second.first && b.first.second <= c.second && c.second <= b.second.second;
+            }
+
+            void way(const osmium::Way& way) noexcept
+            {
+                std::vector<Coordinate> coords;
+                for (const auto& node_ref : way.nodes()) {
+                    if (node_ref.location()) {
+                        Coordinate coord { node_ref.location().lat(),
+                            node_ref.location().lon() };
+                        if (contains(bounds, coord)) {
+                            coords.push_back(coord);
+                        }
+                    }
+                }
+                if (!coords.empty()) {
+                    routes_ref.push_back(coords);
+                }
+            }
+        };
+
+        RouteHandler handler(bounds, routes);
+        osmium::apply(reader, handler);
+        reader.close();
+
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+    }
+
+    return routes;
+}

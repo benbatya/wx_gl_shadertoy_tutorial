@@ -1,16 +1,22 @@
+
+#include "openglcanvas.h"
+#include "osm_loader.h"
+
 // TODO: move the wxWidgets functionality into a separate module
 #include <wx/cmdline.h>
 #include <wx/file.h>
+#include <wx/fswatcher.h>
 #include <wx/log.h>
 #include <wx/settings.h>
 #include <wx/splitter.h>
 #include <wx/stc/stc.h>
 #include <wx/wx.h>
 
-#include "openglcanvas.h"
-#include "osm_loader.h"
+#include <memory>
 
 constexpr size_t IndentWidth = 4;
+
+class MyFrame;
 
 class MyApp : public wxApp {
 public:
@@ -18,29 +24,33 @@ public:
     bool OnInit() wxOVERRIDE;
     void OnInitCmdLine(wxCmdLineParser& parser) wxOVERRIDE;
     bool OnCmdLineParsed(wxCmdLineParser& parser) wxOVERRIDE;
+    void OnEventLoopEnter(wxEventLoopBase* loop) wxOVERRIDE;
+    void OnFileSystemEvent(wxFileSystemWatcherEvent& event);
 
+protected:
     wxString scriptFilePath_ {};
     wxString osmDataFilePath_ {};
+    std::unique_ptr<wxFileSystemWatcher> fileWatcher_ { nullptr };
+    MyFrame* frame_ { nullptr };
+    std::shared_ptr<OSMLoader> osmLoader_ { nullptr };
 };
 
 class MyFrame : public wxFrame {
 public:
     MyFrame(const wxString& title);
-    bool initialize(const wxString& scriptFilePath, const wxString& osmDataFilePath);
+    bool initialize(const wxString& scriptFilePath, const std::shared_ptr<OSMLoader>& osmLoader);
+    bool BuildShaderProgram();
 
 protected:
+    void OnOpenGLInitialized(wxCommandEvent& event);
+    void StylizeTextCtrl();
+    void OnSize(wxSizeEvent& event);
+
     OpenGLCanvas* openGLCanvas { nullptr };
     wxTextCtrl* logTextCtrl { nullptr };
 
     wxString scriptFilePath_ {};
-    wxString osmDataFilePath_ {};
-
-    void OnOpenGLInitialized(wxCommandEvent& event);
-
-    bool BuildShaderProgram();
-    void StylizeTextCtrl();
-
-    void OnSize(wxSizeEvent& event);
+    std::shared_ptr<OSMLoader> osmLoader_ { nullptr };
 };
 
 wxIMPLEMENT_APP(MyApp);
@@ -50,11 +60,19 @@ bool MyApp::OnInit()
     if (!wxApp::OnInit())
         return false;
 
-    MyFrame* frame = new MyFrame("Hello OpenGL");
-    if (!frame->initialize(scriptFilePath_, osmDataFilePath_)) {
+    osmLoader_ = std::make_shared<OSMLoader>();
+    osmLoader_->setFilepath(osmDataFilePath_.ToStdString());
+    if (!osmLoader_->Count()) {
+        wxLogError("Failed to load OSM data from file: %s",
+            osmDataFilePath_);
         return false;
     }
-    frame->Show(true);
+
+    frame_ = new MyFrame("Hello OpenGL");
+    if (!frame_->initialize(scriptFilePath_, osmLoader_)) {
+        return false;
+    }
+    frame_->Show(true);
 
     return true;
 }
@@ -90,15 +108,55 @@ bool MyApp::OnCmdLineParsed(wxCmdLineParser& parser)
     return true;
 }
 
+void MyApp::OnEventLoopEnter(wxEventLoopBase* loop)
+{
+    wxApp::OnEventLoopEnter(loop);
+    std::cout << "Event loop entered: " << loop << std::endl;
+
+    if (!loop) {
+        fileWatcher_.reset();
+        return;
+    }
+
+    if (scriptFilePath_.IsEmpty()) {
+        return;
+    }
+
+    fileWatcher_ = std::make_unique<wxFileSystemWatcher>();
+    Bind(wxEVT_FSWATCHER, &MyApp::OnFileSystemEvent, this);
+    fileWatcher_->SetOwner(this);
+    fileWatcher_->Add(scriptFilePath_, wxFSW_EVENT_MODIFY);
+}
+
+void MyApp::OnFileSystemEvent(wxFileSystemWatcherEvent& event)
+{
+    wxString msg;
+    switch (event.GetChangeType()) {
+    case wxFSW_EVENT_MODIFY:
+        msg.Printf("File modified: %s", event.GetPath().GetFullPath());
+        frame_->BuildShaderProgram();
+        break;
+    case wxFSW_EVENT_CREATE:
+        msg.Printf("File created: %s", event.GetPath().GetFullPath());
+        break;
+    case wxFSW_EVENT_DELETE:
+        msg.Printf("File deleted: %s", event.GetPath().GetFullPath());
+        // scriptFilePath_.clear();
+        break;
+        // ... handle other event types
+    }
+    wxLogMessage(msg); // Log the event for the user
+}
+
 MyFrame::MyFrame(const wxString& title)
     : wxFrame(nullptr, wxID_ANY, title)
 {
 }
 
-bool MyFrame::initialize(const wxString& scriptFilePath, const wxString& osmDataFilePath)
+bool MyFrame::initialize(const wxString& scriptFilePath, const std::shared_ptr<OSMLoader>& osmLoader)
 {
     scriptFilePath_ = scriptFilePath;
-    osmDataFilePath_ = osmDataFilePath;
+    osmLoader_ = osmLoader;
 
     wxGLAttributes vAttrs;
     vAttrs.PlatformDefaults().Defaults().EndList();
@@ -128,6 +186,9 @@ bool MyFrame::initialize(const wxString& scriptFilePath, const wxString& osmData
 
     this->Bind(wxEVT_SIZE, &MyFrame::OnSize, this);
 
+    auto routes = osmLoader_->getRoutes({ { -122.46780, 37.84373 }, { -122.50035, 37.85918 } });
+    std::cout << "Loaded " << routes.size() << " routes from OSM data." << std::endl;
+
     return true;
 }
 
@@ -138,15 +199,6 @@ void MyFrame::OnOpenGLInitialized(wxCommandEvent& event)
 
 bool MyFrame::BuildShaderProgram()
 {
-    // pass OSM data file to OSMLoader
-    OSMLoader osmLoader;
-    osmLoader.setFilepath(osmDataFilePath_.ToStdString());
-    if (!osmLoader.Count()) {
-        wxLogError("Failed to load OSM data from file: %s",
-            osmDataFilePath_);
-        return false;
-    }
-
     // load shader from file
     assert(!scriptFilePath_.IsEmpty());
     wxFile file(scriptFilePath_);
