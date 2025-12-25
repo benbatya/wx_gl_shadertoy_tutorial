@@ -1,3 +1,4 @@
+// TODO: move the wxWidgets functionality into a separate module
 #include <wx/cmdline.h>
 #include <wx/file.h>
 #include <wx/log.h>
@@ -7,6 +8,7 @@
 #include <wx/wx.h>
 
 #include "openglcanvas.h"
+#include "osm_loader.h"
 
 constexpr size_t IndentWidth = 4;
 
@@ -29,6 +31,8 @@ protected:
     wxTextCtrl* logTextCtrl { nullptr };
 
     wxString scriptFilePath_ {};
+
+    OSMLoader osmLoader_;
 
     void OnOpenGLInitialized(wxCommandEvent& event);
 
@@ -57,6 +61,7 @@ void MyApp::OnInitCmdLine(wxCmdLineParser& parser)
 
     static const wxCmdLineEntryDesc cmdLineDesc[] = {
         { wxCMD_LINE_PARAM, NULL, NULL, "Input script file to watch", wxCMD_LINE_VAL_STRING },
+        { wxCMD_LINE_PARAM, NULL, NULL, "Input OSM datafile", wxCMD_LINE_VAL_STRING },
         { wxCMD_LINE_NONE }
     };
 
@@ -72,6 +77,18 @@ bool MyApp::OnCmdLineParsed(wxCmdLineParser& parser)
         scriptFilePath_ = parser.GetParam(0);
     } else {
         return false;
+    }
+
+    if (parser.GetParamCount() > 1) {
+        // pass OSM data file to OSMLoader
+        wxString osmDataFilePath = parser.GetParam(1);
+        OSMLoader osmLoader;
+        osmLoader.setFilepath(osmDataFilePath.ToStdString());
+        if (!osmLoader.Count()) {
+            wxLogError("Failed to load OSM data from file: %s",
+                osmDataFilePath);
+            return false;
+        }
     }
 
     return true;
@@ -105,6 +122,8 @@ MyFrame::MyFrame(const wxString& title, const wxString& scriptFilePath)
 
         this->Bind(wxEVT_SIZE, &MyFrame::OnSize, this);
     }
+
+    // osmLoader_.setFilepath();
 }
 
 void MyFrame::OnOpenGLInitialized(wxCommandEvent& event)

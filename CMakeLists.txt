@@ -60,7 +60,7 @@ list(APPEND CMAKE_MODULE_PATH "${libosmium_SOURCE_DIR}/cmake")
 FetchContent_MakeAvailable(libosmium)
 
 
-set(SRCS src/main.cpp src/openglcanvas.cpp)
+set(SRCS src/main.cpp src/openglcanvas.cpp src/osm_loader.cpp)
 
 if(APPLE)
     # create bundle on apple compiles
@@ -76,4 +76,6 @@ else()
 endif()
 
 target_include_directories(main PRIVATE ${glew_SOURCE_DIR}/include)
+target_include_directories(main PRIVATE ${libosmium_SOURCE_DIR}/include)
+
 target_link_libraries(main PRIVATE wxcore wxstc wxgl glew_s)
