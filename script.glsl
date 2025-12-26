@@ -1,9 +1,8 @@
-#version 330 core
-
-uniform vec2 iResolution;
-uniform float iTime;
-
-out vec4 FragColor;
+// NOTE: GLSL header in/outs are defined in openglcanvas.cpp
+// including:
+//     uniform vec2 iResolution;
+//     uniform float iTime;
+//     out vec4 FragColor;  
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord );
 

@@ -12,16 +12,25 @@ constexpr auto VertexShaderSource = R"(#version 330 core
     }
 )";
 
-OpenGLCanvas::OpenGLCanvas(wxWindow* parent, const wxGLAttributes& canvasAttrs)
-    : wxGLCanvas(parent, canvasAttrs)
-{
+constexpr auto FragmentShaderPrefix = R"(#version 330 core
+
+    // layout(location = 0) in  fragColor;
+
+    uniform vec2 iResolution;
+    uniform float iTime;
+
+    out vec4 FragColor;
+)";
+
+OpenGLCanvas::OpenGLCanvas(wxWindow *parent, const wxGLAttributes &canvasAttrs)
+    : wxGLCanvas(parent, canvasAttrs) {
     wxGLContextAttrs ctxAttrs;
     ctxAttrs.PlatformDefaults().CoreProfile().OGLVersion(3, 3).EndList();
     openGLContext = new wxGLContext(this, nullptr, &ctxAttrs);
 
     if (!openGLContext->IsOK()) {
         wxMessageBox("This sample needs an OpenGL 3.3 capable driver.",
-            "OpenGL version error", wxOK | wxICON_INFORMATION, this);
+                     "OpenGL version error", wxOK | wxICON_INFORMATION, this);
         delete openGLContext;
         openGLContext = nullptr;
     }
@@ -37,33 +46,31 @@ OpenGLCanvas::OpenGLCanvas(wxWindow* parent, const wxGLAttributes& canvasAttrs)
 }
 
 void OpenGLCanvas::CompileCustomFragmentShader(
-    const std::string& customFragmentShaderSource)
-{
+    const std::string &customFragmentShaderSource) {
     shaderProgram.vertexShaderSource = std::string(VertexShaderSource);
-    shaderProgram.fragmentShaderSource = customFragmentShaderSource;
+    shaderProgram.fragmentShaderSource =
+        FragmentShaderPrefix + customFragmentShaderSource;
     shaderProgram.Build();
 }
 
 OpenGLCanvas::~OpenGLCanvas() { delete openGLContext; }
 
-bool OpenGLCanvas::InitializeOpenGLFunctions()
-{
+bool OpenGLCanvas::InitializeOpenGLFunctions() {
     GLenum err = glewInit();
 
     if (GLEW_OK != err) {
         wxLogError("OpenGL GLEW initialization failed: %s",
-            reinterpret_cast<const char*>(glewGetErrorString(err)));
+                   reinterpret_cast<const char *>(glewGetErrorString(err)));
         return false;
     }
 
     wxLogDebug("Status: Using GLEW %s",
-        reinterpret_cast<const char*>(glewGetString(GLEW_VERSION)));
+               reinterpret_cast<const char *>(glewGetString(GLEW_VERSION)));
 
     return true;
 }
 
-bool OpenGLCanvas::InitializeOpenGL()
-{
+bool OpenGLCanvas::InitializeOpenGL() {
     if (!openGLContext) {
         return false;
     }
@@ -72,21 +79,21 @@ bool OpenGLCanvas::InitializeOpenGL()
 
     if (!InitializeOpenGLFunctions()) {
         wxMessageBox("Error: Could not initialize OpenGL function pointers.",
-            "OpenGL initialization error", wxOK | wxICON_INFORMATION,
-            this);
+                     "OpenGL initialization error", wxOK | wxICON_INFORMATION,
+                     this);
         return false;
     }
 
     wxLogDebug("OpenGL version: %s",
-        reinterpret_cast<const char*>(glGetString(GL_VERSION)));
+               reinterpret_cast<const char *>(glGetString(GL_VERSION)));
     wxLogDebug("OpenGL vendor: %s",
-        reinterpret_cast<const char*>(glGetString(GL_VENDOR)));
+               reinterpret_cast<const char *>(glGetString(GL_VENDOR)));
 
     GLfloat quadVertices[] = {
         -1.0f, -1.0f, 0.0f, // Bottom-left vertex
-        1.0f, -1.0f, 0.0f, // Bottom-right vertex
-        -1.0f, 1.0f, 0.0f, // Top-left vertex
-        1.0f, 1.0f, 0.0f // Top-right vertex
+        1.0f,  -1.0f, 0.0f, // Bottom-right vertex
+        -1.0f, 1.0f,  0.0f, // Top-left vertex
+        1.0f,  1.0f,  0.0f  // Top-right vertex
     };
 
     GLuint quadVBO, quadVAO;
@@ -96,9 +103,9 @@ bool OpenGLCanvas::InitializeOpenGL()
     glBindVertexArray(quadVAO);
     glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices,
-        GL_STATIC_DRAW);
+                 GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat),
-        (void*)0);
+                          (void *)0);
     glEnableVertexAttribArray(0);
 
     isOpenGLInitialized = true;
@@ -111,8 +118,7 @@ bool OpenGLCanvas::InitializeOpenGL()
     return true;
 }
 
-void OpenGLCanvas::OnPaint(wxPaintEvent& WXUNUSED(event))
-{
+void OpenGLCanvas::OnPaint(wxPaintEvent &WXUNUSED(event)) {
     wxPaintDC dc(this);
 
     if (!isOpenGLInitialized) {
@@ -135,9 +141,9 @@ void OpenGLCanvas::OnPaint(wxPaintEvent& WXUNUSED(event))
         auto viewPortSize = GetSize() * GetContentScaleFactor();
 
         glUniform2f(glGetUniformLocation(shaderProgram.shaderProgram.value(),
-                        "iResolution"),
-            static_cast<float>(viewPortSize.x),
-            static_cast<float>(viewPortSize.y));
+                                         "iResolution"),
+                    static_cast<float>(viewPortSize.x),
+                    static_cast<float>(viewPortSize.y));
 
         glUniform1f(
             glGetUniformLocation(shaderProgram.shaderProgram.value(), "iTime"),
@@ -148,8 +154,7 @@ void OpenGLCanvas::OnPaint(wxPaintEvent& WXUNUSED(event))
     SwapBuffers();
 }
 
-void OpenGLCanvas::OnSize(wxSizeEvent& event)
-{
+void OpenGLCanvas::OnSize(wxSizeEvent &event) {
     bool firstApperance = IsShownOnScreen() && !isOpenGLInitialized;
 
     if (firstApperance) {
@@ -166,11 +171,11 @@ void OpenGLCanvas::OnSize(wxSizeEvent& event)
     event.Skip();
 }
 
-void OpenGLCanvas::OnTimer(wxTimerEvent& WXUNUSED(event))
-{
+void OpenGLCanvas::OnTimer(wxTimerEvent &WXUNUSED(event)) {
     if (isOpenGLInitialized) {
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::high_resolution_clock::now() - openGLInitializationTime);
+            std::chrono::high_resolution_clock::now() -
+            openGLInitializationTime);
         elapsedSeconds = duration.count() / 1000.0f;
         Refresh(false);
     }
