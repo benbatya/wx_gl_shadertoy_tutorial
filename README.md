@@ -52,9 +52,3 @@ This will create a directory named `build` and create all build artifacts there.
 ./build/main ./script.glsl ~/Downloads/map.osm
 ```
 
-
-
----
-Check out the blog for more! [www.onlyfastcode.com](https://www.onlyfastcode.com)
----
-
