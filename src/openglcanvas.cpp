@@ -113,7 +113,17 @@ OpenGLCanvas::OpenGLCanvas(wxWindow *parent, const wxGLAttributes &canvasAttrs)
 }
 
 void OpenGLCanvas::SetRoutes(const OSMLoader::Routes &routes) {
-    storedRoutes_ = routes;
+    // Only take the first route to keep things simple for now
+    storedRoutes_.clear();
+    constexpr size_t IDX = 0;
+    if (routes.size() < IDX + 1) {
+        return;
+    }
+    auto routeIt = routes.begin();
+    std::advance(routeIt, IDX);
+    storedRoutes_[routeIt->first] = routeIt->second;
+
+    // storedRoutes_ = routes;
 
     if (isOpenGLInitialized) {
         UpdateBuffersFromRoutes();
@@ -179,19 +189,18 @@ void OpenGLCanvas::UpdateBuffersFromRoutes() {
             // color: simple dark gray for now
             vertices.push_back(x);
             vertices.push_back(y);
-            vertices.push_back(0.0f);
-            vertices.push_back(0.0f);
-            vertices.push_back(0.0f);
+            vertices.push_back(0.2f);
+            vertices.push_back(0.2f);
+            vertices.push_back(0.2f);
         }
 
         // indices for GL_LINE_STRIP_ADJACENCY: duplicate first and last
         GLuint countHere = 0;
         // start: duplicate first
         indices.push_back(base);
-        indices.push_back(base);
-        countHere += 2;
+        countHere += 1;
 
-        for (size_t i = 1; i < (vertices.size() / 5) - base; ++i) {
+        for (size_t i = 0; i < (vertices.size() / 5) - base; ++i) {
             indices.push_back(base + static_cast<GLuint>(i));
             ++countHere;
         }
@@ -199,9 +208,7 @@ void OpenGLCanvas::UpdateBuffersFromRoutes() {
         // duplicate last
         indices.push_back(
             base + static_cast<GLuint>((vertices.size() / 5) - 1 - base));
-        indices.push_back(
-            base + static_cast<GLuint>((vertices.size() / 5) - 1 - base));
-        countHere += 2;
+        countHere += 1;
 
         // record draw command (count, byte offset)
         size_t startByteOffset = indexOffset * sizeof(GLuint);

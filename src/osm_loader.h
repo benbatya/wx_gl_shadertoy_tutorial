@@ -16,8 +16,8 @@ class OSMLoader {
     // Using definition of Location:
     // https://osmcode.org/libosmium/manual.html#locations
     using Coordinate = osmium::Location;
-    using Routes =
-        std::unordered_map<osmium::object_id_type, std::vector<Coordinate>>;
+    using Route = std::vector<Coordinate>;
+    using Routes = std::unordered_map<osmium::object_id_type, Route>;
     using CoordinateBounds = osmium::Box;
     /**
      * Get routes within the specified coordinate bounds.
