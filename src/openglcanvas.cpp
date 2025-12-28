@@ -2,9 +2,12 @@
 
 #include <shaders.h>
 
+#include <algorithm>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
+#include <vector>
 
 wxDEFINE_EVENT(wxEVT_OPENGL_INITIALIZED, wxCommandEvent);
 
@@ -109,6 +112,138 @@ OpenGLCanvas::OpenGLCanvas(wxWindow *parent, const wxGLAttributes &canvasAttrs)
     timer.Start(1000 / FPS);
 }
 
+void OpenGLCanvas::SetRoutes(const OSMLoader::Routes &routes) {
+    storedRoutes_ = routes;
+
+    if (isOpenGLInitialized) {
+        UpdateBuffersFromRoutes();
+    }
+}
+
+void OpenGLCanvas::UpdateBuffersFromRoutes() {
+    // Build vertex and index arrays from storedRoutes_. Vertex layout:
+    // x,y,r,g,b
+    std::vector<float> vertices;
+    std::vector<GLuint> indices;
+    drawCommands_.clear();
+
+    if (storedRoutes_.empty()) {
+        elementCount_ = 0;
+        return;
+    }
+
+    // Compute bounds
+    double minLon = std::numeric_limits<double>::max();
+    double maxLon = std::numeric_limits<double>::lowest();
+    double minLat = std::numeric_limits<double>::max();
+    double maxLat = std::numeric_limits<double>::lowest();
+
+    for (const auto &entry : storedRoutes_) {
+        for (const auto &loc : entry.second) {
+            if (!loc.valid())
+                continue;
+            double lon = loc.lon();
+            double lat = loc.lat();
+            minLon = std::min(minLon, lon);
+            maxLon = std::max(maxLon, lon);
+            minLat = std::min(minLat, lat);
+            maxLat = std::max(maxLat, lat);
+        }
+    }
+
+    double lonRange = (maxLon - minLon);
+    double latRange = (maxLat - minLat);
+    if (lonRange == 0.0)
+        lonRange = 1.0;
+    if (latRange == 0.0)
+        latRange = 1.0;
+
+    size_t indexOffset = 0;
+    for (const auto &entry : storedRoutes_) {
+        const auto &coords = entry.second;
+        if (coords.size() < 2)
+            continue;
+
+        GLuint base = static_cast<GLuint>(vertices.size() / 5);
+
+        // vertices
+        for (const auto &loc : coords) {
+            if (!loc.valid())
+                continue;
+            double lon = loc.lon();
+            double lat = loc.lat();
+            float x =
+                static_cast<float>(((lon - minLon) / lonRange) * 2.0 - 1.0);
+            float y =
+                static_cast<float>(((lat - minLat) / latRange) * 2.0 - 1.0);
+            // color: simple dark gray for now
+            vertices.push_back(x);
+            vertices.push_back(y);
+            vertices.push_back(0.0f);
+            vertices.push_back(0.0f);
+            vertices.push_back(0.0f);
+        }
+
+        // indices for GL_LINE_STRIP_ADJACENCY: duplicate first and last
+        GLuint countHere = 0;
+        // start: duplicate first
+        indices.push_back(base);
+        indices.push_back(base);
+        countHere += 2;
+
+        for (size_t i = 1; i < (vertices.size() / 5) - base; ++i) {
+            indices.push_back(base + static_cast<GLuint>(i));
+            ++countHere;
+        }
+
+        // duplicate last
+        indices.push_back(
+            base + static_cast<GLuint>((vertices.size() / 5) - 1 - base));
+        indices.push_back(
+            base + static_cast<GLuint>((vertices.size() / 5) - 1 - base));
+        countHere += 2;
+
+        // record draw command (count, byte offset)
+        size_t startByteOffset = indexOffset * sizeof(GLuint);
+        drawCommands_.emplace_back(static_cast<GLsizei>(countHere),
+                                   startByteOffset);
+        indexOffset += countHere;
+    }
+
+    elementCount_ = static_cast<GLsizei>(indices.size());
+
+    // Create VAO/VBO/EBO if necessary and upload
+    if (VAO_ == 0)
+        glGenVertexArrays(1, &VAO_);
+    glBindVertexArray(VAO_);
+
+    if (VBO_ == 0)
+        glGenBuffers(1, &VBO_);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_);
+    if (!vertices.empty())
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float),
+                     vertices.data(), GL_STATIC_DRAW);
+
+    if (EBO_ == 0)
+        glGenBuffers(1, &EBO_);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO_);
+    if (!indices.empty())
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint),
+                     indices.data(), GL_STATIC_DRAW);
+
+    // vertex attributes
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+                          reinterpret_cast<void *>(0));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+                          reinterpret_cast<void *>(2 * sizeof(float)));
+
+    // Unbind
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
 void OpenGLCanvas::CompileShaderProgram() {
     shaderProgram.vertexShaderSource = VertexShader;
     shaderProgram.geometryShaderSource = GeometryShader;
@@ -182,46 +317,58 @@ bool OpenGLCanvas::InitializeOpenGL() {
 
     CompileShaderProgram();
 
-    // From
-    // https://github.com/JoeyDeVries/LearnOpenGL/tree/master/src/4.advanced_opengl/9.1.geometry_shader_houses
-    // set up vertex data (and buffer(s)) and configure vertex attributes
-    // ------------------------------------------------------------------
-    GLfloat points[] = {
-        -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, // bottom-left
-        -0.5f, 0.5f,  0.0f, 1.0f, 0.0f, // top-left
-        0.5f,  0.5f,  0.0f, 0.0f, 1.0f, // top-right
-        0.5f,  -0.5f, 1.0f, 1.0f, 0.0f, // bottom-right
-    };
-    GLuint indices[] = {0, 0, 1, 2, 3, 0, 0};
+    // If routes were provided before GL initialization, upload them now.
+    if (!storedRoutes_.empty()) {
+        UpdateBuffersFromRoutes();
+    } else {
+        // From
+        // https://github.com/JoeyDeVries/LearnOpenGL/tree/master/src/4.advanced_opengl/9.1.geometry_shader_houses
+        // set up vertex data (and buffer(s)) and configure vertex attributes
+        // ------------------------------------------------------------------
+        GLfloat points[] = {
+            -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, // bottom-left
+            -0.5f, 0.5f,  0.0f, 1.0f, 0.0f, // top-left
+            0.5f,  0.5f,  0.0f, 0.0f, 1.0f, // top-right
+            0.5f,  -0.5f, 1.0f, 1.0f, 0.0f, // bottom-right
+        };
+        GLuint indices[] = {0, 0, 1, 2, 3, 3};
 
-    // store element count so draw code doesn't need a hardcoded value
-    elementCount_ = static_cast<GLsizei>(sizeof(indices) / sizeof(indices[0]));
+        // store element count so draw code doesn't need a hardcoded value
+        elementCount_ =
+            static_cast<GLsizei>(sizeof(indices) / sizeof(indices[0]));
 
-    glGenBuffers(1, &VBO_);
-    glGenVertexArrays(1, &VAO_);
-    glGenBuffers(1, &EBO_);
+        // Create and bind VAO first, then create buffers and upload data while
+        // the VAO is bound. This keeps the EBO binding stored in the VAO state
+        // and consolidates buffer setup into a small, easy-to-read block.
+        glGenVertexArrays(1, &VAO_);
+        glBindVertexArray(VAO_);
 
-    glBindVertexArray(VAO_);
+        glGenBuffers(1, &VBO_);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO_);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(points), points, GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO_);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(points), points, GL_STATIC_DRAW);
+        // element buffer (EBO) is part of VAO state while VAO is bound
+        glGenBuffers(1, &EBO_);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO_);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
+                     GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO_);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
-                 GL_STATIC_DRAW);
+        // vertex attributes
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+                              reinterpret_cast<void *>(0));
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+                              reinterpret_cast<void *>(2 * sizeof(float)));
 
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), 0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
-                          (void *)(2 * sizeof(float)));
-
-    // Do not unbind the element array buffer while the VAO is bound.
-    // The EBO binding is stored in the VAO state. Unbinding it here would
-    // break the VAO's association with the index buffer and cause
-    // glDrawElements to read from a null pointer.
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+        // Unbind the array buffer (safe — EBO stays bound to VAO). Unbind VAO
+        // to avoid accidental state changes elsewhere.
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+        // single draw command for fallback geometry
+        drawCommands_.clear();
+        drawCommands_.emplace_back(elementCount_, 0);
+    }
 
     isOpenGLInitialized = true;
     openGLInitializationTime = std::chrono::high_resolution_clock::now();
@@ -249,8 +396,17 @@ void OpenGLCanvas::OnPaint(wxPaintEvent &WXUNUSED(event)) {
         glUseProgram(shaderProgram.shaderProgram.value());
 
         glBindVertexArray(VAO_);
-        glDrawElements(GL_LINE_STRIP_ADJACENCY, elementCount_, GL_UNSIGNED_INT,
-                       0);
+        if (!drawCommands_.empty()) {
+            for (const auto &cmd : drawCommands_) {
+                GLsizei count = cmd.first;
+                const void *offset = reinterpret_cast<const void *>(cmd.second);
+                glDrawElements(GL_LINE_STRIP_ADJACENCY, count, GL_UNSIGNED_INT,
+                               offset);
+            }
+        } else {
+            glDrawElements(GL_LINE_STRIP_ADJACENCY, elementCount_,
+                           GL_UNSIGNED_INT, 0);
+        }
         glBindVertexArray(0); // Unbind VAO_ for safety
     }
     SwapBuffers();

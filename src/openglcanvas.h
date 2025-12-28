@@ -6,7 +6,9 @@
 
 #include <chrono>
 
+#include "osm_loader.h"
 #include "shaderprogram.h"
+#include <unordered_map>
 
 wxDECLARE_EVENT(wxEVT_OPENGL_INITIALIZED, wxCommandEvent);
 
@@ -23,6 +25,10 @@ class OpenGLCanvas : public wxGLCanvas {
     void OnSize(wxSizeEvent &event);
 
     void OnTimer(wxTimerEvent &event);
+
+    // Upload routes from OSMLoader into GPU buffers. This replaces the
+    // existing VBO_/EBO_ contents when called.
+    void SetRoutes(const OSMLoader::Routes &routes);
 
   protected:
     void CompileShaderProgram();
@@ -47,4 +53,12 @@ class OpenGLCanvas : public wxGLCanvas {
     GLuint VBO_{0};           // vertex buffer object
     GLuint EBO_{0};           // element buffer object
     GLsizei elementCount_{0}; // number of indices in the EBO
+    // Stored routes (kept so buffers can be uploaded after GL init)
+    OSMLoader::Routes storedRoutes_{};
+    // Draw commands: pair<count, byteOffsetInEBO>
+    std::vector<std::pair<GLsizei, size_t>> drawCommands_{};
+
+    // Update GPU buffers from `storedRoutes_` (called after GL init or when
+    // SetRoutes is invoked while GL is available).
+    void UpdateBuffersFromRoutes();
 };

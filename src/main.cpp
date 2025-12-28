@@ -102,16 +102,9 @@ bool MyFrame::initialize(const std::shared_ptr<OSMLoader> &osmLoader) {
         return false;
     }
 
-    // wxSplitterWindow *mainSplitter = new wxSplitterWindow(
-    //     this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
-
     openGLCanvas = new OpenGLCanvas(this, vAttrs);
 
     this->Bind(wxEVT_OPENGL_INITIALIZED, &MyFrame::OnOpenGLInitialized, this);
-
-    // mainSplitter->SetSashGravity(1.0);
-    // mainSplitter->SetMinimumPaneSize(FromDIP(10));
-    // mainSplitter->SplitHorizontally(openGLCanvas, nullptr, -FromDIP(20));
 
     this->SetSize(FromDIP(wxSize(1200, 600)));
     this->SetMinSize(FromDIP(wxSize(800, 400)));
@@ -122,6 +115,10 @@ bool MyFrame::initialize(const std::shared_ptr<OSMLoader> &osmLoader) {
         osmLoader_->getRoutes({{-122.50035, 37.84373}, {-122.46780, 37.85918}});
     std::cout << "Loaded " << routes.size() << " routes from OSM data."
               << std::endl;
+    // Upload routes into the OpenGL canvas so it can replace the VBO/EBO.
+    if (openGLCanvas) {
+        openGLCanvas->SetRoutes(routes);
+    }
 
     return true;
 }
