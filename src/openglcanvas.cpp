@@ -112,17 +112,48 @@ OpenGLCanvas::OpenGLCanvas(wxWindow *parent, const wxGLAttributes &canvasAttrs)
     timer.Start(1000 / FPS);
 }
 
-void OpenGLCanvas::SetRoutes(const OSMLoader::Routes &routes) {
-    // Only take the first route to keep things simple for now
+void OpenGLCanvas::SetRoutes(const OSMLoader::Routes &routes,
+                             const osmium::Box &bounds) {
+    bounds_ = bounds;
+    // Find the longest routes and store only those for testing
     storedRoutes_.clear();
-    constexpr size_t IDX = 0;
-    if (routes.size() < IDX + 1) {
-        return;
-    }
-    auto routeIt = routes.begin();
-    std::advance(routeIt, IDX);
-    storedRoutes_[routeIt->first] = routeIt->second;
 
+    constexpr size_t NUM_ROUTES = 1;
+
+    std::unordered_map<size_t, std::vector<osmium::object_id_type>>
+        routeIdToLength;
+
+    for (const auto &route : routes) {
+        auto length = route.second.size();
+        routeIdToLength[length].push_back(route.first);
+    }
+
+    std::vector<size_t> sortedLengths;
+    for (const auto &pair : routeIdToLength) {
+        sortedLengths.push_back(pair.first);
+    }
+    std::sort(sortedLengths.rbegin(), sortedLengths.rend());
+
+    size_t count = 0;
+    for (size_t length : sortedLengths) {
+        for (auto routeId : routeIdToLength[length]) {
+            if (count >= NUM_ROUTES)
+                break;
+            storedRoutes_[routeId] = routes.at(routeId);
+            std::cout << "Selected route ID " << routeId << " with length "
+                      << length << std::endl;
+            ++count;
+        }
+    }
+
+    // size_t count = 0;
+    // for (const auto &route : routes) {
+    //     if (count >= IDX) {
+    //         break;
+    //     }
+    //     ++count;
+    //     storedRoutes_[route.first] = route.second;
+    // }
     // storedRoutes_ = routes;
 
     if (isOpenGLInitialized) {
@@ -142,24 +173,11 @@ void OpenGLCanvas::UpdateBuffersFromRoutes() {
         return;
     }
 
-    // Compute bounds
-    double minLon = std::numeric_limits<double>::max();
-    double maxLon = std::numeric_limits<double>::lowest();
-    double minLat = std::numeric_limits<double>::max();
-    double maxLat = std::numeric_limits<double>::lowest();
-
-    for (const auto &entry : storedRoutes_) {
-        for (const auto &loc : entry.second) {
-            if (!loc.valid())
-                continue;
-            double lon = loc.lon();
-            double lat = loc.lat();
-            minLon = std::min(minLon, lon);
-            maxLon = std::max(maxLon, lon);
-            minLat = std::min(minLat, lat);
-            maxLat = std::max(maxLat, lat);
-        }
-    }
+    // // Compute bounds
+    double minLon = bounds_.left();
+    double maxLon = bounds_.right();
+    double minLat = bounds_.bottom();
+    double maxLat = bounds_.top();
 
     double lonRange = (maxLon - minLon);
     double latRange = (maxLat - minLat);
@@ -182,10 +200,12 @@ void OpenGLCanvas::UpdateBuffersFromRoutes() {
                 continue;
             double lon = loc.lon();
             double lat = loc.lat();
-            float x =
-                static_cast<float>(((lon - minLon) / lonRange) * 2.0 - 1.0);
-            float y =
-                static_cast<float>(((lat - minLat) / latRange) * 2.0 - 1.0);
+            double deltaLon = lon - minLon;
+            double deltaLat = lat - minLat;
+            double xNorm = deltaLon / lonRange;
+            double yNorm = deltaLat / latRange;
+            float x = static_cast<float>(xNorm * 2.0 - 1.0);
+            float y = static_cast<float>(yNorm * 2.0 - 1.0);
             // color: simple dark gray for now
             vertices.push_back(x);
             vertices.push_back(y);
