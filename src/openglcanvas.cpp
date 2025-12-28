@@ -184,7 +184,7 @@ void OpenGLCanvas::OnPaint(wxPaintEvent &WXUNUSED(event)) {
         // glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         glBindVertexArray(VAO_);
-        glDrawArrays(GL_LINE_STRIP, 0, 4);
+        glDrawArrays(GL_LINE_STRIP_ADJACENCY, 0, 4);
     }
     SwapBuffers();
 }
