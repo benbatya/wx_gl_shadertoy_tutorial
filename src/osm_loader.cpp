@@ -148,10 +148,10 @@ struct NodeReducer : public osmium::handler::Handler {
 
     const osmium::Box &bounds_;
     const NodeWaysMap &nodeWaysMap_;
-    OSMLoader::Routes &routes_;
+    OSMLoader::Ways &routes_;
 
     NodeReducer(const osmium::Box &bounds, const NodeWaysMap &nodeWaysMap,
-                OSMLoader::Routes &routes)
+                OSMLoader::Ways &routes)
         : bounds_(bounds), nodeWaysMap_(nodeWaysMap), routes_(routes) {}
 
     void node(const osmium::Node &node) noexcept {
@@ -178,8 +178,8 @@ struct NodeReducer : public osmium::handler::Handler {
 
 } // namespace
 
-OSMLoader::Routes OSMLoader::getRoutes(const CoordinateBounds &bounds) const {
-    Routes routes;
+OSMLoader::Ways OSMLoader::getWays(const CoordinateBounds &bounds) const {
+    Ways routes;
 
     if (filepath_.empty()) {
         std::cerr << "No input file specified." << std::endl;

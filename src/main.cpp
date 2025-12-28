@@ -114,12 +114,12 @@ bool MyFrame::initialize(const std::shared_ptr<OSMLoader> &osmLoader) {
     const auto bounds =
         osmium::Box({-122.50035, 37.84373}, {-122.46780, 37.85918});
 
-    auto routes = osmLoader_->getRoutes(bounds);
-    std::cout << "Loaded " << routes.size() << " routes from OSM data."
+    auto ways = osmLoader_->getWays(bounds);
+    std::cout << "Loaded " << ways.size() << " ways from OSM data."
               << std::endl;
-    // Upload routes into the OpenGL canvas so it can replace the VBO/EBO.
+    // Upload ways into the OpenGL canvas so it can replace the VBO/EBO.
     if (openGLCanvas) {
-        openGLCanvas->SetRoutes(routes, bounds);
+        openGLCanvas->SetWays(ways, bounds);
     }
 
     return true;

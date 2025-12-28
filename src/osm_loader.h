@@ -16,16 +16,16 @@ class OSMLoader {
     // Using definition of Location:
     // https://osmcode.org/libosmium/manual.html#locations
     using Coordinate = osmium::Location;
-    using Route = std::vector<Coordinate>;
-    using Routes = std::unordered_map<osmium::object_id_type, Route>;
+    using Way = std::vector<Coordinate>;
+    using Ways = std::unordered_map<osmium::object_id_type, Way>;
     using CoordinateBounds = osmium::Box;
     /**
-     * Get routes within the specified coordinate bounds.
+     * Get ways within the specified coordinate bounds.
      * @param bounds The coordinate bounds (min and max coordinates).
      * @return A vector of routes, where each route is represented as a vector
      * of coordinates
      */
-    Routes getRoutes(const CoordinateBounds &bounds) const;
+    Ways getWays(const CoordinateBounds &bounds) const;
 
   protected:
     std::string filepath_{};

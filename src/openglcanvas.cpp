@@ -112,48 +112,50 @@ OpenGLCanvas::OpenGLCanvas(wxWindow *parent, const wxGLAttributes &canvasAttrs)
     timer.Start(1000 / FPS);
 }
 
-void OpenGLCanvas::SetRoutes(const OSMLoader::Routes &routes,
-                             const osmium::Box &bounds) {
+void OpenGLCanvas::SetWays(const OSMLoader::Ways &routes,
+                           const osmium::Box &bounds) {
     bounds_ = bounds;
     // Find the longest routes and store only those for testing
-    storedRoutes_.clear();
+    storedWays_.clear();
 
-    constexpr size_t NUM_ROUTES = 1;
+    constexpr size_t NUM_WAYS = 1;
 
-    std::unordered_map<size_t, std::vector<osmium::object_id_type>>
-        routeIdToLength;
+    std::unordered_map<size_t, std::vector<osmium::object_id_type>> lenIdMap;
 
     for (const auto &route : routes) {
         auto length = route.second.size();
-        routeIdToLength[length].push_back(route.first);
+        lenIdMap[length].push_back(route.first);
     }
 
     std::vector<size_t> sortedLengths;
-    for (const auto &pair : routeIdToLength) {
+    for (const auto &pair : lenIdMap) {
         sortedLengths.push_back(pair.first);
     }
     std::sort(sortedLengths.rbegin(), sortedLengths.rend());
 
     size_t count = 0;
     for (size_t length : sortedLengths) {
-        for (auto routeId : routeIdToLength[length]) {
-            if (count >= NUM_ROUTES)
+        for (auto routeId : lenIdMap[length]) {
+            if (count >= NUM_WAYS)
                 break;
-            storedRoutes_[routeId] = routes.at(routeId);
-            std::cout << "Selected route ID " << routeId << " with length "
+            storedWays_[routeId] = routes.at(routeId);
+            std::cout << "Selected way ID " << routeId << " with length "
                       << length << std::endl;
             ++count;
         }
     }
 
+    // take first N routes
     // size_t count = 0;
     // for (const auto &route : routes) {
-    //     if (count >= IDX) {
+    //     if (count >= NUM_WAYS) {
     //         break;
     //     }
     //     ++count;
     //     storedRoutes_[route.first] = route.second;
     // }
+
+    // Take all ways
     // storedRoutes_ = routes;
 
     if (isOpenGLInitialized) {
@@ -168,7 +170,7 @@ void OpenGLCanvas::UpdateBuffersFromRoutes() {
     std::vector<GLuint> indices;
     drawCommands_.clear();
 
-    if (storedRoutes_.empty()) {
+    if (storedWays_.empty()) {
         elementCount_ = 0;
         return;
     }
@@ -187,7 +189,7 @@ void OpenGLCanvas::UpdateBuffersFromRoutes() {
         latRange = 1.0;
 
     size_t indexOffset = 0;
-    for (const auto &entry : storedRoutes_) {
+    for (const auto &entry : storedWays_) {
         const auto &coords = entry.second;
         if (coords.size() < 2)
             continue;
@@ -345,7 +347,7 @@ bool OpenGLCanvas::InitializeOpenGL() {
     CompileShaderProgram();
 
     // If routes were provided before GL initialization, upload them now.
-    if (!storedRoutes_.empty()) {
+    if (!storedWays_.empty()) {
         UpdateBuffersFromRoutes();
     } else {
         // From
