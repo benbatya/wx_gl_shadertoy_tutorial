@@ -118,7 +118,7 @@ void OpenGLCanvas::SetWays(const OSMLoader::Ways &routes,
     // Find the longest routes and store only those for testing
     storedWays_.clear();
 
-    constexpr size_t NUM_WAYS = 1;
+    const size_t NUM_WAYS = std::min(routes.size(), static_cast<size_t>(60));
 
     std::unordered_map<size_t, std::vector<osmium::object_id_type>> lenIdMap;
 
