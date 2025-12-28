@@ -64,6 +64,8 @@ OpenGLCanvas::~OpenGLCanvas() {
     glDeleteVertexArrays(1, &VAO_);
     glDeleteBuffers(1, &VBO_);
 
+    glDeleteBuffers(1, &EBO_);
+
     delete openGLContext;
 }
 
@@ -108,27 +110,39 @@ bool OpenGLCanvas::InitializeOpenGL() {
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
     GLfloat points[] = {
-        -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, // bottom-left dummy
         -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, // bottom-left
         -0.5f, 0.5f,  0.0f, 1.0f, 0.0f, // top-left
         0.5f,  0.5f,  0.0f, 0.0f, 1.0f, // top-right
         0.5f,  -0.5f, 1.0f, 1.0f, 0.0f, // bottom-right
-        0.5f,  -0.5f, 1.0f, 1.0f, 0.0f  // bottom-right dummy
-
     };
+    GLuint indices[] = {0, 1, 2, 3};
+
+    // store element count so draw code doesn't need a hardcoded value
+    elementCount_ = static_cast<GLsizei>(sizeof(indices) / sizeof(indices[0]));
+
     glGenBuffers(1, &VBO_);
     glGenVertexArrays(1, &VAO_);
+    glGenBuffers(1, &EBO_);
 
     glBindVertexArray(VAO_);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO_);
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof(points), &points, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(points), points, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO_);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
+                 GL_STATIC_DRAW);
+
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), 0);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
                           (void *)(2 * sizeof(float)));
 
+    // Do not unbind the element array buffer while the VAO is bound.
+    // The EBO binding is stored in the VAO state. Unbinding it here would
+    // break the VAO's association with the index buffer and cause
+    // glDrawElements to read from a null pointer.
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
@@ -158,7 +172,9 @@ void OpenGLCanvas::OnPaint(wxPaintEvent &WXUNUSED(event)) {
         glUseProgram(shaderProgram.shaderProgram.value());
 
         glBindVertexArray(VAO_);
-        glDrawArrays(GL_LINE_STRIP_ADJACENCY, 0, 7);
+        glDrawElements(GL_LINE_STRIP_ADJACENCY, elementCount_, GL_UNSIGNED_INT,
+                       0);
+        glBindVertexArray(0); // Unbind VAO_ for safety
     }
     SwapBuffers();
 }

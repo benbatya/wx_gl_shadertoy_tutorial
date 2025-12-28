@@ -44,5 +44,7 @@ class OpenGLCanvas : public wxGLCanvas {
     float elapsedSeconds{0.0f};
 
     GLuint VAO_{0};
-    GLuint VBO_{0};
+    GLuint VBO_{0};           // vertex buffer object
+    GLuint EBO_{0};           // element buffer object
+    GLsizei elementCount_{0}; // number of indices in the EBO
 };
