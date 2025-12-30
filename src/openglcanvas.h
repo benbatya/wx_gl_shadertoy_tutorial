@@ -30,6 +30,7 @@ class OpenGLCanvas : public wxGLCanvas {
     void OnLeftUp(wxMouseEvent &event);
     void OnMouseMotion(wxMouseEvent &event);
     void OnMouseWheel(wxMouseEvent &event);
+    void OnZoomGesture(wxZoomGestureEvent &event);
 
     // Upload routes from OSMLoader into GPU buffers. This replaces the
     // existing VBO_/EBO_ contents when called.
@@ -46,6 +47,8 @@ class OpenGLCanvas : public wxGLCanvas {
     // Update GPU buffers from `storedWays_` (called after GL init or when
     // SetWays is invoked while GL is available).
     void UpdateBuffersFromRoutes();
+
+    void Zoom(double scale, const wxPoint &mousePos);
 
     wxGLContext *openGLContext_;
     bool isOpenGLInitialized_{false};
@@ -78,4 +81,5 @@ class OpenGLCanvas : public wxGLCanvas {
     bool isDragging_{false};
     wxPoint lastMousePos_{0, 0};
     long prevEventTimestamp_{0};
+    double lastZoomFactor_{1.0};
 };

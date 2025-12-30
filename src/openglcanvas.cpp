@@ -110,6 +110,10 @@ OpenGLCanvas::OpenGLCanvas(wxWindow *parent, const wxGLAttributes &canvasAttrs) 
     // Bind mouse wheel events for zooming
     Bind(wxEVT_MOUSEWHEEL, &OpenGLCanvas::OnMouseWheel, this);
 
+    // Bind zoom gesture events
+    Bind(wxEVT_GESTURE_ZOOM, &OpenGLCanvas::OnZoomGesture, this);
+    EnableTouchEvents(wxTOUCH_ZOOM_GESTURE);
+
     timer_.SetOwner(this);
     this->Bind(wxEVT_TIMER, &OpenGLCanvas::OnTimer, this);
 
@@ -539,9 +543,26 @@ void OpenGLCanvas::OnMouseWheel(wxMouseEvent &event) {
     const int steps = (rotation / delta);
 
     // scale per step (<1 zooms in, >1 zooms out when steps negative)
-    const double stepScale = 0.9; // each step scales viewport by 90%
+    const double stepScale = 0.9;
     const double scale = std::pow(stepScale, steps);
 
+    Zoom(scale, event.GetPosition());
+}
+
+void OpenGLCanvas::OnZoomGesture(wxZoomGestureEvent &event) {
+    if (event.IsGestureStart()) {
+        lastZoomFactor_ = 1.0;
+    }
+
+    double currentZoomFactor = event.GetZoomFactor();
+    // Viewport range should scale inversely with magnification
+    double scale = 1.0 / (currentZoomFactor / lastZoomFactor_);
+    lastZoomFactor_ = currentZoomFactor;
+
+    Zoom(scale, event.GetPosition());
+}
+
+void OpenGLCanvas::Zoom(double scale, const wxPoint &mousePos) {
     // current bounds
     double minLon = bounds_.left();
     double maxLon = bounds_.right();
@@ -559,7 +580,7 @@ void OpenGLCanvas::OnMouseWheel(wxMouseEvent &event) {
     if (viewPortSize.x <= 0 || viewPortSize.y <= 0)
         return;
 
-    auto pos = event.GetPosition() * GetContentScaleFactor();
+    auto pos = mousePos * GetContentScaleFactor();
     double mx = static_cast<double>(pos.x);
     double my = static_cast<double>(pos.y);
     double w = static_cast<double>(viewPortSize.x);
@@ -582,27 +603,13 @@ void OpenGLCanvas::OnMouseWheel(wxMouseEvent &event) {
     if (newLonRange < kMinRange || newLatRange < kMinRange)
         return;
 
-    double newMinLon = centerLon - newLonRange / 2.0;
-    double newMaxLon = centerLon + newLonRange / 2.0;
-    double newMinLat = centerLat - newLatRange / 2.0;
-    double newMaxLat = centerLat + newLatRange / 2.0;
-
     // Adjust new min/max to keep mouse position fixed in lon/lat space
-    newMinLon = centerLon - newLonRange * xNorm;
-    newMaxLon = centerLon + newLonRange * (1.0 - xNorm);
-    newMinLat = centerLat - newLatRange * yNorm;
-    newMaxLat = centerLat + newLatRange * (1.0 - yNorm);
+    double newMinLon = centerLon - newLonRange * xNorm;
+    double newMaxLon = centerLon + newLonRange * (1.0 - xNorm);
+    double newMinLat = centerLat - newLatRange * yNorm;
+    double newMaxLat = centerLat + newLatRange * (1.0 - yNorm);
 
-    auto newBounds = osmium::Box({newMinLon, newMinLat}, {newMaxLon, newMaxLat});
-
-    // std::cout << "Timestamp: " << event.GetTimestamp() << "Zoom step: " << steps << ", scale: " << scale
-    //           << "\n xNorm: " << xNorm << ", yNorm: " << yNorm << "\n, prevRange: (" << lonRange << "," << latRange
-    //           << "), newRange: " << newLonRange << "," << newLatRange << ")" << "\n, prevBounds: " << bounds_
-    //           << "\n, newBounds: " << newBounds << "\n, prevCenter: (" << (minLon + maxLon) / 2.0 << ","
-    //           << (minLat + maxLat) / 2.0 << ")" << "\n, newCenter: (" << (newMinLon + newMaxLon) / 2.0 << ","
-    //           << (newMinLat + newMaxLat) / 2.0 << ")" << std::endl;
-
-    bounds_ = newBounds;
+    bounds_ = osmium::Box({newMinLon, newMinLat}, {newMaxLon, newMaxLat});
 
     Refresh(false);
 }
