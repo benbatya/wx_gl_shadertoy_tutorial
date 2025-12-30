@@ -336,60 +336,7 @@ bool OpenGLCanvas::InitializeOpenGL() {
     CompileShaderProgram();
 
     // If ways were provided before GL initialization, upload them now.
-    if (!storedWays_.empty()) {
-        UpdateBuffersFromRoutes();
-    } else {
-        // From
-        // https://github.com/JoeyDeVries/LearnOpenGL/tree/master/src/4.advanced_opengl/9.1.geometry_shader_houses
-        // set up vertex data (and buffer(s)) and configure vertex attributes
-        // ------------------------------------------------------------------
-        // Fallback geometry: store coordinates such that after normalization
-        // by the shader they map to the same positions as before. We use
-        // lon/lat values in the range [-0.5,0.5] and set bounds_ accordingly
-        // so the shader produces identical output.
-        GLfloat points[] = {
-            -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, // bottom-left (lon,lat,index,r,g)
-            -0.5f, 0.5f,  0.0f, 1.0f, 0.0f, // top-left
-            0.5f,  0.5f,  0.0f, 0.0f, 1.0f, // top-right
-            0.5f,  -0.5f, 1.0f, 1.0f, 0.0f, // bottom-right
-        };
-        GLuint indices[] = {0, 0, 1, 2, 3, 3};
-
-        // store element count so draw code doesn't need a hardcoded value
-        elementCount_ = static_cast<GLsizei>(sizeof(indices) / sizeof(indices[0]));
-
-        // Create and bind VAO first, then create buffers and upload data while
-        // the VAO is bound. This keeps the EBO binding stored in the VAO state
-        // and consolidates buffer setup into a small, easy-to-read block.
-        glGenVertexArrays(1, &VAO_);
-        glBindVertexArray(VAO_);
-
-        glGenBuffers(1, &VBO_);
-        glBindBuffer(GL_ARRAY_BUFFER, VBO_);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(points), points, GL_STATIC_DRAW);
-
-        // element buffer (EBO) is part of VAO state while VAO is bound
-        glGenBuffers(1, &EBO_);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO_);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-        // vertex attributes
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<void *>(0));
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<void *>(2 * sizeof(float)));
-
-        // Unbind the array buffer (safe — EBO stays bound to VAO). Unbind VAO
-        // to avoid accidental state changes elsewhere.
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
-        // set bounds so shader maps [-0.5,0.5] to the same clip-space
-        bounds_ = osmium::Box({-0.5, -0.5}, {0.5, 0.5});
-
-        // single draw command for fallback geometry
-        drawCommands_.clear();
-        drawCommands_.emplace_back(elementCount_, 0);
-    }
+    UpdateBuffersFromRoutes();
 
     isOpenGLInitialized_ = true;
     openGLInitializationTime_ = std::chrono::high_resolution_clock::now();
@@ -652,19 +599,14 @@ void OpenGLCanvas::OnMouseWheel(wxMouseEvent &event) {
 
     auto newBounds = osmium::Box({newMinLon, newMinLat}, {newMaxLon, newMaxLat});
 
-    std::cout << "Timestamp: " << event.GetTimestamp() << "Zoom step: " << steps << ", scale: " << scale
-              << "\n xNorm: " << xNorm << ", yNorm: " << yNorm << "\n, prevRange: (" << lonRange << "," << latRange
-              << "), newRange: " << newLonRange << "," << newLatRange << ")" << "\n, prevBounds: " << bounds_
-              << "\n, newBounds: " << newBounds << "\n, prevCenter: (" << (minLon + maxLon) / 2.0 << ","
-              << (minLat + maxLat) / 2.0 << ")" << "\n, newCenter: (" << (newMinLon + newMaxLon) / 2.0 << ","
-              << (newMinLat + newMaxLat) / 2.0 << ")" << std::endl;
+    // std::cout << "Timestamp: " << event.GetTimestamp() << "Zoom step: " << steps << ", scale: " << scale
+    //           << "\n xNorm: " << xNorm << ", yNorm: " << yNorm << "\n, prevRange: (" << lonRange << "," << latRange
+    //           << "), newRange: " << newLonRange << "," << newLatRange << ")" << "\n, prevBounds: " << bounds_
+    //           << "\n, newBounds: " << newBounds << "\n, prevCenter: (" << (minLon + maxLon) / 2.0 << ","
+    //           << (minLat + maxLat) / 2.0 << ")" << "\n, newCenter: (" << (newMinLon + newMaxLon) / 2.0 << ","
+    //           << (newMinLat + newMaxLat) / 2.0 << ")" << std::endl;
 
     bounds_ = newBounds;
-
-    // If ways are present, update GPU buffers to reflect new projection
-    if (isOpenGLInitialized_) {
-        UpdateBuffersFromRoutes();
-    }
 
     Refresh(false);
 }
