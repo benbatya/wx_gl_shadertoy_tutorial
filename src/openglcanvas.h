@@ -30,7 +30,7 @@ class OpenGLCanvas : public wxGLCanvas {
     void OnLeftUp(wxMouseEvent &event);
     void OnMouseMotion(wxMouseEvent &event);
 
-    // void OnMouseWheel(wxMouseEvent &event);
+    void OnMouseWheel(wxMouseEvent &event);
 
     // Upload routes from OSMLoader into GPU buffers. This replaces the
     // existing VBO_/EBO_ contents when called.

@@ -15,8 +15,7 @@ wxDEFINE_EVENT(wxEVT_OPENGL_INITIALIZED, wxCommandEvent);
 // GL debug callback function used when KHR_debug is available. Logs
 // messages (skips notifications) through wxLogError and stderr for
 // high-severity messages.
-static void GLDebugCallbackFunc(GLenum source, GLenum type, GLuint id,
-                                GLenum severity, GLsizei length,
+static void GLDebugCallbackFunc(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length,
                                 const GLchar *message, const void *userParam) {
     if (severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
         return;
@@ -90,15 +89,14 @@ static void GLDebugCallbackFunc(GLenum source, GLenum type, GLuint id,
     std::cerr << ss.str() << std::endl;
 }
 
-OpenGLCanvas::OpenGLCanvas(wxWindow *parent, const wxGLAttributes &canvasAttrs)
-    : wxGLCanvas(parent, canvasAttrs) {
+OpenGLCanvas::OpenGLCanvas(wxWindow *parent, const wxGLAttributes &canvasAttrs) : wxGLCanvas(parent, canvasAttrs) {
     wxGLContextAttrs ctxAttrs;
     ctxAttrs.PlatformDefaults().CoreProfile().OGLVersion(3, 3).EndList();
     openGLContext = new wxGLContext(this, nullptr, &ctxAttrs);
 
     if (!openGLContext->IsOK()) {
-        wxMessageBox("This sample needs an OpenGL 3.3 capable driver.",
-                     "OpenGL version error", wxOK | wxICON_INFORMATION, this);
+        wxMessageBox("This sample needs an OpenGL 3.3 capable driver.", "OpenGL version error",
+                     wxOK | wxICON_INFORMATION, this);
         delete openGLContext;
         openGLContext = nullptr;
     }
@@ -110,7 +108,7 @@ OpenGLCanvas::OpenGLCanvas(wxWindow *parent, const wxGLAttributes &canvasAttrs)
     Bind(wxEVT_MOTION, &OpenGLCanvas::OnMouseMotion, this);
 
     // Bind mouse wheel events for zooming
-    // Bind(wxEVT_MOUSEWHEEL, &OpenGLCanvas::OnMouseWheel, this);
+    Bind(wxEVT_MOUSEWHEEL, &OpenGLCanvas::OnMouseWheel, this);
 
     timer.SetOwner(this);
     this->Bind(wxEVT_TIMER, &OpenGLCanvas::OnTimer, this);
@@ -119,8 +117,7 @@ OpenGLCanvas::OpenGLCanvas(wxWindow *parent, const wxGLAttributes &canvasAttrs)
     timer.Start(1000 / FPS);
 }
 
-void OpenGLCanvas::SetWays(const OSMLoader::Ways &ways,
-                           const osmium::Box &bounds) {
+void OpenGLCanvas::SetWays(const OSMLoader::Ways &ways, const osmium::Box &bounds) {
     bounds_ = bounds;
     // Find the longest ways and store only those for testing
     storedWays_.clear();
@@ -232,14 +229,12 @@ void OpenGLCanvas::UpdateBuffersFromRoutes() {
         }
 
         // duplicate last
-        indices.push_back(
-            base + static_cast<GLuint>((vertices.size() / 5) - 1 - base));
+        indices.push_back(base + static_cast<GLuint>((vertices.size() / 5) - 1 - base));
         countHere += 1;
 
         // record draw command (count, byte offset)
         size_t startByteOffset = indexOffset * sizeof(GLuint);
-        drawCommands_.emplace_back(static_cast<GLsizei>(countHere),
-                                   startByteOffset);
+        drawCommands_.emplace_back(static_cast<GLsizei>(countHere), startByteOffset);
         indexOffset += countHere;
     }
 
@@ -254,23 +249,19 @@ void OpenGLCanvas::UpdateBuffersFromRoutes() {
         glGenBuffers(1, &VBO_);
     glBindBuffer(GL_ARRAY_BUFFER, VBO_);
     if (!vertices.empty())
-        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float),
-                     vertices.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
 
     if (EBO_ == 0)
         glGenBuffers(1, &EBO_);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO_);
     if (!indices.empty())
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint),
-                     indices.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
 
     // vertex attributes
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
-                          reinterpret_cast<void *>(0));
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<void *>(0));
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
-                          reinterpret_cast<void *>(2 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<void *>(2 * sizeof(float)));
 
     // Unbind
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -303,13 +294,11 @@ bool OpenGLCanvas::InitializeOpenGLFunctions() {
     GLenum err = glewInit();
 
     if (GLEW_OK != err) {
-        wxLogError("OpenGL GLEW initialization failed: %s",
-                   reinterpret_cast<const char *>(glewGetErrorString(err)));
+        wxLogError("OpenGL GLEW initialization failed: %s", reinterpret_cast<const char *>(glewGetErrorString(err)));
         return false;
     }
 
-    wxLogDebug("Status: Using GLEW %s",
-               reinterpret_cast<const char *>(glewGetString(GLEW_VERSION)));
+    wxLogDebug("Status: Using GLEW %s", reinterpret_cast<const char *>(glewGetString(GLEW_VERSION)));
 
     return true;
 }
@@ -322,16 +311,13 @@ bool OpenGLCanvas::InitializeOpenGL() {
     SetCurrent(*openGLContext);
 
     if (!InitializeOpenGLFunctions()) {
-        wxMessageBox("Error: Could not initialize OpenGL function pointers.",
-                     "OpenGL initialization error", wxOK | wxICON_INFORMATION,
-                     this);
+        wxMessageBox("Error: Could not initialize OpenGL function pointers.", "OpenGL initialization error",
+                     wxOK | wxICON_INFORMATION, this);
         return false;
     }
 
-    wxLogDebug("OpenGL version: %s",
-               reinterpret_cast<const char *>(glGetString(GL_VERSION)));
-    wxLogDebug("OpenGL vendor: %s",
-               reinterpret_cast<const char *>(glGetString(GL_VENDOR)));
+    wxLogDebug("OpenGL version: %s", reinterpret_cast<const char *>(glGetString(GL_VERSION)));
+    wxLogDebug("OpenGL vendor: %s", reinterpret_cast<const char *>(glGetString(GL_VENDOR)));
 
     // Setup GL debug callback if available (KHR_debug)
     if (GLEW_KHR_debug) {
@@ -341,8 +327,7 @@ bool OpenGLCanvas::InitializeOpenGL() {
         glDebugMessageCallback(GLDebugCallbackFunc, this);
 
         // Enable all messages (you can filter with glDebugMessageControl)
-        glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0,
-                              nullptr, GL_TRUE);
+        glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
         wxLogDebug("KHR_debug is available: GL debug output enabled");
     } else {
         wxLogDebug("KHR_debug not available; GL debug output disabled");
@@ -371,8 +356,7 @@ bool OpenGLCanvas::InitializeOpenGL() {
         GLuint indices[] = {0, 0, 1, 2, 3, 3};
 
         // store element count so draw code doesn't need a hardcoded value
-        elementCount_ =
-            static_cast<GLsizei>(sizeof(indices) / sizeof(indices[0]));
+        elementCount_ = static_cast<GLsizei>(sizeof(indices) / sizeof(indices[0]));
 
         // Create and bind VAO first, then create buffers and upload data while
         // the VAO is bound. This keeps the EBO binding stored in the VAO state
@@ -387,16 +371,13 @@ bool OpenGLCanvas::InitializeOpenGL() {
         // element buffer (EBO) is part of VAO state while VAO is bound
         glGenBuffers(1, &EBO_);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO_);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
-                     GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
         // vertex attributes
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
-                              reinterpret_cast<void *>(0));
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<void *>(0));
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
-                              reinterpret_cast<void *>(2 * sizeof(float)));
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<void *>(2 * sizeof(float)));
 
         // Unbind the array buffer (safe — EBO stays bound to VAO). Unbind VAO
         // to avoid accidental state changes elsewhere.
@@ -451,12 +432,10 @@ void OpenGLCanvas::OnPaint(wxPaintEvent &WXUNUSED(event)) {
             lonRange = 1.0;
         if (latRange == 0.0)
             latRange = 1.0;
-        GLint loc = glGetUniformLocation(shaderProgram.shaderProgram.value(),
-                                         "uBounds");
+        GLint loc = glGetUniformLocation(shaderProgram.shaderProgram.value(), "uBounds");
         if (loc >= 0) {
-            glUniform4f(
-                loc, static_cast<float>(minLon), static_cast<float>(minLat),
-                static_cast<float>(lonRange), static_cast<float>(latRange));
+            glUniform4f(loc, static_cast<float>(minLon), static_cast<float>(minLat), static_cast<float>(lonRange),
+                        static_cast<float>(latRange));
         }
 
         glBindVertexArray(VAO_);
@@ -464,12 +443,10 @@ void OpenGLCanvas::OnPaint(wxPaintEvent &WXUNUSED(event)) {
             for (const auto &cmd : drawCommands_) {
                 GLsizei count = cmd.first;
                 const void *offset = reinterpret_cast<const void *>(cmd.second);
-                glDrawElements(GL_LINE_STRIP_ADJACENCY, count, GL_UNSIGNED_INT,
-                               offset);
+                glDrawElements(GL_LINE_STRIP_ADJACENCY, count, GL_UNSIGNED_INT, offset);
             }
         } else {
-            glDrawElements(GL_LINE_STRIP_ADJACENCY, elementCount_,
-                           GL_UNSIGNED_INT, 0);
+            glDrawElements(GL_LINE_STRIP_ADJACENCY, elementCount_, GL_UNSIGNED_INT, 0);
         }
         glBindVertexArray(0); // Unbind VAO_ for safety
     }
@@ -478,8 +455,7 @@ void OpenGLCanvas::OnPaint(wxPaintEvent &WXUNUSED(event)) {
     // Update FPS counters and draw overlay text
     ++framesSinceLastFps;
     auto now = std::chrono::high_resolution_clock::now();
-    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(
-        now - lastFpsUpdateTime);
+    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastFpsUpdateTime);
     if (dur.count() >= 250) { // update FPS every 250ms for smoother display
         float seconds = dur.count() / 1000.0f;
         if (seconds > 0.0f) {
@@ -526,8 +502,7 @@ void OpenGLCanvas::OnSize(wxSizeEvent &event) {
 void OpenGLCanvas::OnTimer(wxTimerEvent &WXUNUSED(event)) {
     if (isOpenGLInitialized) {
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::high_resolution_clock::now() -
-            openGLInitializationTime);
+            std::chrono::high_resolution_clock::now() - openGLInitializationTime);
         elapsedSeconds = duration.count() / 1000.0f;
         Refresh(false);
     }
@@ -604,70 +579,85 @@ void OpenGLCanvas::OnMouseMotion(wxMouseEvent &event) {
     Refresh(false);
 }
 
-// void OpenGLCanvas::OnMouseWheel(wxMouseEvent &event) {
-//     // Use wheel rotation to compute zoom steps
-//     const int rotation = event.GetWheelRotation();
-//     const int delta = event.GetWheelDelta();
-//     if (delta == 0 || rotation == 0)
-//         return;
+void OpenGLCanvas::OnMouseWheel(wxMouseEvent &event) {
+    // Use wheel rotation to compute zoom steps
+    const int rotation = event.GetWheelRotation();
+    const int delta = event.GetWheelDelta();
+    if (delta == 0 || rotation == 0)
+        return;
 
-//     const int steps = rotation / delta;
+    const int steps = (rotation / delta);
 
-//     // scale per step (<1 zooms in, >1 zooms out when steps negative)
-//     const double stepScale = 0.9; // each step scales viewport by 90%
-//     const double scale = std::pow(stepScale, steps);
+    // scale per step (<1 zooms in, >1 zooms out when steps negative)
+    const double stepScale = 0.9; // each step scales viewport by 90%
+    const double scale = std::pow(stepScale, steps);
 
-//     // current bounds
-//     double minLon = bounds_.left();
-//     double maxLon = bounds_.right();
-//     double minLat = bounds_.bottom();
-//     double maxLat = bounds_.top();
+    // current bounds
+    double minLon = bounds_.left();
+    double maxLon = bounds_.right();
+    double minLat = bounds_.bottom();
+    double maxLat = bounds_.top();
 
-//     double lonRange = (maxLon - minLon);
-//     double latRange = (maxLat - minLat);
-//     if (lonRange == 0.0 || latRange == 0.0)
-//         return;
+    double lonRange = (maxLon - minLon);
+    double latRange = (maxLat - minLat);
+    if (lonRange == 0.0 || latRange == 0.0)
+        return;
 
-//     // Map mouse position to [0,1] in lon/lat space. Need to account for
-//     // content scale factor used when setting the viewport.
-//     auto viewPortSize = GetClientSize() * GetContentScaleFactor();
-//     if (viewPortSize.x <= 0 || viewPortSize.y <= 0)
-//         return;
+    // Map mouse position to [0,1] in lon/lat space. Need to account for
+    // content scale factor used when setting the viewport.
+    auto viewPortSize = GetClientSize() * GetContentScaleFactor();
+    if (viewPortSize.x <= 0 || viewPortSize.y <= 0)
+        return;
 
-//     auto pos = event.GetPosition() * GetContentScaleFactor();
-//     double mx = static_cast<double>(pos.x);
-//     double my = static_cast<double>(pos.y);
-//     double w = static_cast<double>(viewPortSize.x);
-//     double h = static_cast<double>(viewPortSize.y);
+    auto pos = event.GetPosition() * GetContentScaleFactor();
+    double mx = static_cast<double>(pos.x);
+    double my = static_cast<double>(pos.y);
+    double w = static_cast<double>(viewPortSize.x);
+    double h = static_cast<double>(viewPortSize.y);
 
-//     double xNorm = mx / w;
-//     double yNorm = 1.0 - (my / h); // invert Y (wx origin is top-left)
+    double xNorm = mx / w;
+    double yNorm = 1.0 - (my / h); // invert Y (wx origin is top-left)
 
-//     // clamp
-//     xNorm = std::min(std::max(xNorm, 0.0), 1.0);
-//     yNorm = std::min(std::max(yNorm, 0.0), 1.0);
+    // clamp
+    xNorm = std::min(std::max(xNorm, 0.0), 1.0);
+    yNorm = std::min(std::max(yNorm, 0.0), 1.0);
 
-//     double centerLon = minLon + xNorm * lonRange;
-//     double centerLat = minLat + yNorm * latRange;
+    double centerLon = minLon + xNorm * lonRange;
+    double centerLat = minLat + yNorm * latRange;
 
-//     double newLonRange = lonRange * scale;
-//     double newLatRange = latRange * scale;
+    double newLonRange = lonRange * scale;
+    double newLatRange = latRange * scale;
 
-//     const double kMinRange = 1e-12;
-//     if (newLonRange < kMinRange || newLatRange < kMinRange)
-//         return;
+    const double kMinRange = 1e-12;
+    if (newLonRange < kMinRange || newLatRange < kMinRange)
+        return;
 
-//     double newMinLon = centerLon - newLonRange / 2.0;
-//     double newMaxLon = centerLon + newLonRange / 2.0;
-//     double newMinLat = centerLat - newLatRange / 2.0;
-//     double newMaxLat = centerLat + newLatRange / 2.0;
+    double newMinLon = centerLon - newLonRange / 2.0;
+    double newMaxLon = centerLon + newLonRange / 2.0;
+    double newMinLat = centerLat - newLatRange / 2.0;
+    double newMaxLat = centerLat + newLatRange / 2.0;
 
-//     bounds_ = osmium::Box({newMinLon, newMinLat}, {newMaxLon, newMaxLat});
+    // Adjust new min/max to keep mouse position fixed in lon/lat space
+    newMinLon = centerLon - newLonRange * xNorm;
+    newMaxLon = centerLon + newLonRange * (1.0 - xNorm);
+    newMinLat = centerLat - newLatRange * yNorm;
+    newMaxLat = centerLat + newLatRange * (1.0 - yNorm);
 
-//     // If ways are present, update GPU buffers to reflect new projection
-//     if (isOpenGLInitialized) {
-//         UpdateBuffersFromRoutes();
-//     }
+    auto newBounds = osmium::Box({newMinLon, newMinLat}, {newMaxLon, newMaxLat});
 
-//     Refresh(false);
-// }
+    std::cout << "Timestamp: " << event.GetTimestamp() << "Zoom step: " << steps << ", scale: " << scale
+              << "\n xNorm: " << xNorm << ", yNorm: " << yNorm << "\n, prevRange: (" << lonRange << "," << latRange
+              << "), newRange: " << newLonRange << "," << newLatRange << ")" << "\n, prevBounds: " << bounds_
+              << "\n, newBounds: " << newBounds << "\n, prevCenter: (" << (minLon + maxLon) / 2.0 << ","
+              << (minLat + maxLat) / 2.0 << ")" << "\n, newCenter: (" << (newMinLon + newMaxLon) / 2.0 << ","
+              << (newMinLat + newMaxLat) / 2.0 << ")" << std::endl;
+
+    bounds_ = newBounds;
+
+    // If ways are present, update GPU buffers to reflect new projection
+    if (isOpenGLInitialized) {
+        UpdateBuffersFromRoutes();
+    }
+
+    Refresh(false);
+}
