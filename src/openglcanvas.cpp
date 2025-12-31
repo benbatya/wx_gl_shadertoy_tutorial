@@ -168,6 +168,16 @@ void OpenGLCanvas::SetWays(const OSMLoader::Ways &ways, const osmium::Box &bound
     // Take all ways
     storedWays_ = ways;
 
+    OSMLoader::Way boundsWay{};
+    boundsWay.id = 42;
+    boundsWay.name = "bounds";
+    boundsWay.nodes = {osmium::Location(bounds.left(), bounds.bottom()),
+                       osmium::Location(bounds.right(), bounds.bottom()),
+                       osmium::Location(bounds.right(), bounds.top()), osmium::Location(bounds.left(), bounds.top()),
+                       osmium::Location(bounds.left(), bounds.bottom())};
+    boundsWay.type = "footpath";
+    storedWays_[boundsWay.id] = boundsWay;
+
     if (isOpenGLInitialized_) {
         UpdateBuffersFromRoutes();
     }
