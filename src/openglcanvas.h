@@ -34,7 +34,7 @@ class OpenGLCanvas : public wxGLCanvas {
 
     // Upload routes from OSMLoader into GPU buffers. This replaces the
     // existing VBO_/EBO_ contents when called.
-    void SetWays(const OSMLoader::Ways &routes, const osmium::Box &bounds);
+    void SetWays(const OSMLoader::Id2Way &routes, const osmium::Box &bounds);
 
   protected:
     void CompileShaderProgram();
@@ -81,7 +81,7 @@ class OpenGLCanvas : public wxGLCanvas {
     wxRect viewportBounds_{};
 
     // Stored routes (kept so buffers can be uploaded after GL init)
-    OSMLoader::Ways storedWays_{};
+    OSMLoader::Id2Way storedWays_{};
     // Draw commands: pair<count, byteOffsetInEBO>
     std::vector<std::pair<GLsizei, size_t>> drawCommands_{};
 

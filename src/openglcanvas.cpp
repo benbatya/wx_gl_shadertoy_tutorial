@@ -122,7 +122,7 @@ OpenGLCanvas::OpenGLCanvas(wxWindow *parent, const wxGLAttributes &canvasAttrs) 
     timer_.Start(1000 / FPS);
 }
 
-void OpenGLCanvas::SetWays(const OSMLoader::Ways &ways, const osmium::Box &bounds) {
+void OpenGLCanvas::SetWays(const OSMLoader::Id2Way &ways, const osmium::Box &bounds) {
     coordinateBounds_ = bounds;
     // Find the longest ways and store only those for testing
     storedWays_.clear();
@@ -169,14 +169,14 @@ void OpenGLCanvas::SetWays(const OSMLoader::Ways &ways, const osmium::Box &bound
     storedWays_ = ways;
 
     // add the boundary
-    OSMLoader::Way boundsWay{};
+    OSMLoader::Ways_t boundsWay{};
     boundsWay.id = 42;
     boundsWay.name = "bounds";
     boundsWay.nodes = {osmium::Location(bounds.left(), bounds.bottom()),
                        osmium::Location(bounds.right(), bounds.bottom()),
                        osmium::Location(bounds.right(), bounds.top()), osmium::Location(bounds.left(), bounds.top()),
                        osmium::Location(bounds.left(), bounds.bottom())};
-    boundsWay.type = "footpath";
+    boundsWay.strType = "footpath";
     storedWays_[boundsWay.id] = boundsWay;
 
     if (isOpenGLInitialized_) {
@@ -215,7 +215,7 @@ void OpenGLCanvas::UpdateBuffersFromRoutes() {
 
         GLuint base = static_cast<GLuint>(vertices.size() / 5);
         const auto &color =
-            HIGHWAY2COLOR.count(entry.second.type) == 0 ? DEFAULT_COLOR : HIGHWAY2COLOR.at(entry.second.type);
+            HIGHWAY2COLOR.count(entry.second.strType) == 0 ? DEFAULT_COLOR : HIGHWAY2COLOR.at(entry.second.strType);
 
         for (const auto &loc : coords.nodes) {
             assert(loc.valid());

@@ -45,7 +45,6 @@
 #include <iostream> // for std::cout, std::cerr
 #include <unordered_set>
 namespace {
-using NodeID = osmium::object_id_type;
 struct WayNodePair {
     osmium::object_id_type wayID;
     size_t nodeIndex;
@@ -61,39 +60,85 @@ struct WayNodePairHash {
     }
 };
 
-using NodeWaysMap = std::unordered_map<NodeID, std::unordered_set<WayNodePair, WayNodePairHash>>;
-using WayNameMap = std::unordered_map<osmium::object_id_type, std::string>;
+using Id2Ways = std::unordered_map<osmium::object_id_type, std::unordered_set<WayNodePair, WayNodePairHash>>;
+using Id2String = std::unordered_map<osmium::object_id_type, std::string>;
 struct MappedWayData {
-    NodeWaysMap nodeWaysMap;
-    WayNameMap wayNames;
-    WayNameMap highwayTypes;
+    Id2Ways node2Ways;
+    Id2String way2Name;
+    Id2String highway2Type;
+};
+
+// Map of Way -> Relationships
+using Id2Ids = std::unordered_map<osmium::object_id_type, std::unordered_set<osmium::object_id_type>>;
+struct RelationshipData {
+    Id2Ids way2Relationships;    // all of the ways that are referenced by relationships
+    Id2Ids node2Relationships;   // all of the nodes that are referenced by relationships
+    Id2String relationship2Name; // all relationship names
+    Id2String relationship2Type; // all relationship types
+};
+
+struct RelationshipHandler : public osmium::handler::Handler {
+    RelationshipData relationshipData;
+
+    void relation(const osmium::Relation &relation) noexcept {
+        auto tag_value = relation.tags().get_value_by_key("type");
+
+        if (std::strcmp(tag_value, "boundary") != 0) {
+            return;
+        }
+        for (const auto &member : relation.members()) {
+            if (member.type() == osmium::item_type::way) {
+                relationshipData.way2Relationships[member.ref()].insert(relation.id());
+            } else if (member.type() == osmium::item_type::node) {
+                relationshipData.node2Relationships[member.ref()].insert(relation.id());
+            }
+        }
+
+        if (auto tag_value = relation.tags().get_value_by_key("name"); tag_value) {
+            relationshipData.relationship2Name[relation.id()] = tag_value;
+        }
+        if (auto tag_value = relation.tags().get_value_by_key("type"); tag_value) {
+            relationshipData.relationship2Type[relation.id()] = tag_value;
+        }
+    };
 };
 
 struct NodeWayMapper : public osmium::handler::Handler {
     // Map of Node IDs -> Way IDs to be retrieved later
+    const RelationshipData &inputRelationships;
+    // TODO: finish this...
+    OSMLoader::Id2Relationship finalRelationships;
+
     MappedWayData wayData;
 
-    NodeWayMapper() = default;
+    NodeWayMapper(const RelationshipData &relationshipData) : inputRelationships(relationshipData) {}
 
     void way(const osmium::Way &way) noexcept {
+        if (inputRelationships.way2Relationships.count(way.id()) > 0) {
+            for (const auto &relationship : inputRelationships.way2Relationships.at(way.id())) {
+                finalRelationships[relationship].id = way.id();
+                finalRelationships
+            }
+        }
+
         // filter out ways which are not tagged as highway
         auto tag_value = way.tags().get_value_by_key("highway");
         if (tag_value) {
-            wayData.highwayTypes[way.id()] = tag_value;
+            wayData.highway2Type[way.id()] = tag_value;
         } else {
             return;
         }
 
         tag_value = way.tags().get_value_by_key("name");
         if (tag_value) {
-            wayData.wayNames[way.id()] = tag_value;
+            wayData.way2Name[way.id()] = tag_value;
         }
 
         for (size_t ii = 0; ii < way.nodes().size(); ++ii) {
             const auto &node_ref = way.nodes()[ii];
             // Assume that we only get po
             assert(node_ref.ref() > 0);
-            auto &nodeMap = wayData.nodeWaysMap[node_ref.ref()];
+            auto &nodeMap = wayData.node2Ways[node_ref.ref()];
             nodeMap.emplace(way.id(), ii);
         }
     }
@@ -104,9 +149,9 @@ struct NodeReducer : public osmium::handler::Handler {
     const osmium::Box &bounds_;
     const MappedWayData &wayData_;
 
-    OSMLoader::Ways &routes_;
+    OSMLoader::Id2Way &routes_;
 
-    NodeReducer(const osmium::Box &bounds, const MappedWayData &wayData, OSMLoader::Ways &routes)
+    NodeReducer(const osmium::Box &bounds, const MappedWayData &wayData, OSMLoader::Id2Way &routes)
         : bounds_(bounds), wayData_(wayData), routes_(routes) {}
 
     void node(const osmium::Node &node) noexcept {
@@ -119,8 +164,8 @@ struct NodeReducer : public osmium::handler::Handler {
             return;
         }
 
-        auto it = wayData_.nodeWaysMap.find(node.id());
-        if (it == wayData_.nodeWaysMap.end()) {
+        auto it = wayData_.node2Ways.find(node.id());
+        if (it == wayData_.node2Ways.end()) {
             return;
         }
         // This node is part of one or more requested ways
@@ -133,10 +178,10 @@ struct NodeReducer : public osmium::handler::Handler {
             route.nodes[way.nodeIndex] = node.location();
             route.id = way.wayID;
             if (route.name.empty()) {
-                route.name = wayData_.wayNames.count(way.wayID) > 0 ? wayData_.wayNames.at(way.wayID) : "";
+                route.name = wayData_.way2Name.count(way.wayID) > 0 ? wayData_.way2Name.at(way.wayID) : "";
             }
             if (route.type.empty()) {
-                route.type = wayData_.highwayTypes.count(way.wayID) > 0 ? wayData_.highwayTypes.at(way.wayID) : "";
+                route.type = wayData_.highway2Type.count(way.wayID) > 0 ? wayData_.highway2Type.at(way.wayID) : "";
             }
         }
     }
@@ -144,8 +189,8 @@ struct NodeReducer : public osmium::handler::Handler {
 
 } // namespace
 
-OSMLoader::Ways OSMLoader::getWays(const CoordinateBounds &bounds) const {
-    Ways routes;
+OSMLoader::Id2Way OSMLoader::getWays(const CoordinateBounds &bounds) const {
+    Id2Way routes;
 
     if (filepath_.empty()) {
         std::cerr << "No input file specified." << std::endl;
