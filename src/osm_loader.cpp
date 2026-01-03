@@ -132,14 +132,6 @@ struct WayHandler : public osmium::handler::Handler {
         auto &wayData = this->wayData;
 
         if (isWayInRelationship(way)) {
-            std::cout << "Way " << way.id() << " is in relationship ";
-            for (const auto &relationshipId : inputRelationships.way2Relationships.at(way.id())) {
-                std::cout << std::to_string(relationshipId);
-            }
-            std::cout << std::endl;
-        }
-
-        if (isWayInRelationship(way)) {
             const auto &tags = way.tags();
             if (auto tag_value = tags.get_value_by_key(TYPE_TAG); tag_value) {
                 wayData.id2Tags[way.id()][TYPE_TAG] = tag_value;
@@ -158,12 +150,22 @@ struct WayHandler : public osmium::handler::Handler {
             }
         }
 
+        if (isWayInRelationship(way)) {
+            std::cout << "Relationship Way " << way.id() << " is in relationship ";
+            for (const auto &relationshipId : inputRelationships.way2Relationships.at(way.id())) {
+                std::cout << std::to_string(relationshipId);
+            }
+            std::array<char, 128> buffer;
+            std::snprintf(buffer.data(), buffer.size(), " and has %lu nodes\n", way.nodes().size());
+            std::cout << buffer.data();
+        }
+        const size_t offset = isWayInRelationship(way) ? way.nodes().size() : 0;
         for (size_t ii = 0; ii < way.nodes().size(); ++ii) {
             const auto &node_ref = way.nodes()[ii];
             // Assume that we only get po
             assert(node_ref.ref() > 0);
             auto &nodeMap = wayData.node2Ways[node_ref.ref()];
-            nodeMap.emplace(way.id(), ii);
+            nodeMap.emplace(way.id(), ii + offset);
         }
     }
 };
