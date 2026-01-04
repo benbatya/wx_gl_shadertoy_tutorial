@@ -185,9 +185,7 @@ void OpenGLCanvas::SetData(const OSMLoader::OSMData &data, const osmium::Box &bo
     boundsWay.tags[HIGHWAY_TAG] = "footpath";
     storedRoutes_[boundsWay.id] = boundsWay;
 
-    if (isOpenGLInitialized_) {
-        UpdateBuffersFromRoutes();
-    }
+    UpdateBuffersFromRoutes();
 }
 
 void OpenGLCanvas::AddLineStripAdjacencyToBuffers(const OSMLoader::Coordinates &coords, const Color_t &color,
@@ -238,6 +236,10 @@ void OpenGLCanvas::AddLineStripAdjacencyToBuffers(const OSMLoader::Coordinates &
 }
 
 void OpenGLCanvas::UpdateBuffersFromRoutes() {
+    if (!isOpenGLInitialized_) {
+        return;
+    }
+
     // Build vertex and index arrays from storedRoutes_. Vertex layout:
     // x,y,r,g,b
     std::vector<float> vertices;
@@ -380,10 +382,11 @@ bool OpenGLCanvas::InitializeOpenGL() {
 
     CompileShaderProgram();
 
+    isOpenGLInitialized_ = true;
+
     // If ways were provided before GL initialization, upload them now.
     UpdateBuffersFromRoutes();
 
-    isOpenGLInitialized_ = true;
     openGLInitializationTime_ = std::chrono::high_resolution_clock::now();
     // initialize FPS timer state
     lastFpsUpdateTime_ = std::chrono::high_resolution_clock::now();
@@ -411,8 +414,11 @@ void OpenGLCanvas::OnPaint(wxPaintEvent &WXUNUSED(event)) {
 
     SetCurrent(*openGLContext_);
 
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     float clearColor = 0.87f;
-    glClearColor(clearColor, clearColor, clearColor, 1.0f);
+    glClearColor(clearColor, clearColor, clearColor, 0.5f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     if (shaderProgram_.shaderProgram_.has_value()) {
@@ -639,7 +645,7 @@ void OpenGLCanvas::Zoom(double scale, const wxPoint &mousePosIn) {
     viewportBounds_.width = static_cast<int>(std::round(newW));
     viewportBounds_.height = static_cast<int>(std::round(newH));
 
-    std::cout << "Zoom: called" << std::endl;
+    // std::cout << "Zoom: called" << std::endl;
 
     Refresh(false);
 }
