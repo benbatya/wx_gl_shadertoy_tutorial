@@ -262,6 +262,16 @@ void OpenGLCanvas::UpdateBuffersFromRoutes() {
 
     size_t indexOffset = 0;
 
+    auto color = AREA_COLOR;
+    for (const auto &area : storedAreas_) {
+        for (const auto &outerRing : area.second.outerRings) {
+            AddLineStripAdjacencyToBuffers(outerRing, color, vertices, indices, indexOffset);
+            for (auto &component : color) {
+                component *= 0.8f;
+            }
+        }
+    }
+
     for (const auto &entry : storedRoutes_) {
         const auto &coords = entry.second;
         if (coords.nodes.size() < 2)
@@ -271,16 +281,6 @@ void OpenGLCanvas::UpdateBuffersFromRoutes() {
         const std::string &highwayType = entry.second.tags.count(HIGHWAY_TAG) ? entry.second.tags.at(HIGHWAY_TAG) : "";
         const auto &color = HIGHWAY2COLOR.count(highwayType) ? HIGHWAY2COLOR.at(highwayType) : DEFAULT_COLOR;
         AddLineStripAdjacencyToBuffers(coords.nodes, color, vertices, indices, indexOffset);
-    }
-
-    auto color = AREA_COLOR;
-    for (const auto &area : storedAreas_) {
-        for (const auto &outerRing : area.second.outerRings) {
-            AddLineStripAdjacencyToBuffers(outerRing, color, vertices, indices, indexOffset);
-            for (auto &component : color) {
-                component *= 0.8f;
-            }
-        }
     }
 
     elementCount_ = static_cast<GLsizei>(indices.size());
